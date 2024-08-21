@@ -1,18 +1,17 @@
 {
-  "name": "node-keylogger",
-  "version": "0.0.1",
-  "description": "Simple Node.js keylogger using event emitters",
-  "main": "lib/index.js",
+  "name": "custom-node-keylogger",
+  "version": "0.1.0",
+  "description": "Custom Node.js keylogger using event listeners",
+  "main": "dist/main.js",
   "scripts": {
-    "compile": "babel --presets es2015 src/ -q -d lib/",
-    "prepublish": "npm run compile",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "babel --presets @babel/preset-env src/ -q -d dist/",
+    "prepare": "npm run build",
+    "test": "echo \"Tests not implemented yet\" && exit 1"
   },
   "keywords": [
     "keylogger",
-    "keyboard",
-    "input",
+    "keyboard-input",
+    "nodejs",
     "linux"
   ]
-
 }
