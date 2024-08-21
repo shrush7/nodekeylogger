@@ -1,57 +1,56 @@
 'use strict';
 const fs = require('fs');
 const EventEmitter = require('events').EventEmitter;
-const toKey = require('./keycodes');
+const keyMappings = require('./keycodes');
 
-const EVENT_TYPES = ['keyup', 'keypress', 'keydown'];
-const EV_KEY = 1;
+const KEY_EVENT_TYPES = ['key-release', 'key-press', 'key-hold'];
+const EV_KEY_CODE = 1;
 
-function Keyboard(dev) {
-  this.dev = dev || 'event0';
-  this.bufferSize = 24;
-  this.buffer = new Buffer(this.bufferSize);
-  this.data = fs.createReadStream(`/dev/input/${this.dev}`);
-  this.onRead();
-}
-
-Keyboard.prototype = Object.create(EventEmitter.prototype, {
-  constructor: { value: Keyboard }
-});
-
-Keyboard.prototype.onRead = function onRead() {
-  const self = this;
-
-  this.data.on('data', data => {
-    this.buffer = data.slice(24);
-    let event = parse(this, this.buffer);
-    if (event) {
-      event.dev = self.dev;
-      self.emit(event.type, event);
-    }
-  });
-
-  this.data.on('error', err => {
-    self.emit('error', err);
-    throw new Error(err);
-  });
-
-}
-
-function parse(input, buffer) {
-  let event;
-  if (buffer.readUInt16LE(16) === EV_KEY) {
-    event = {
-      timeS: buffer.readUInt16LE(0),
-      timeMS: buffer.readUInt16LE(8),
-      keyCode: buffer.readUInt16LE(18),
-    };
-    event.keyId = toKey[event.keyCode];
-    event.type = EVENT_TYPES[buffer.readUInt32LE(20)];
+// Custom class to handle keyboard events from Linux input
+class KeyboardListener extends EventEmitter {
+  constructor(devicePath = 'event0') {
+    super();
+    this.device = devicePath;
+    this.bufferLength = 24;
+    this.buffer = Buffer.alloc(this.bufferLength);
+    this.inputStream = fs.createReadStream(`/dev/input/${this.device}`);
+    this._initiateRead();
   }
-  return event;
+
+  _initiateRead() {
+    this.inputStream.on('data', (chunk) => {
+      this.buffer = chunk.slice(24); // Grab the event data from the buffer.
+      const eventData = this._processInputBuffer(this.buffer);
+      if (eventData) {
+        eventData.device = this.device;
+        this.emit(eventData.type, eventData);
+      }
+    });
+
+    this.inputStream.on('error', (error) => {
+      this.emit('error', error);
+      throw new Error(`Input device error: ${error.message}`);
+    });
+  }
+
+  _processInputBuffer(buffer) {
+    let parsedEvent = null;
+    if (buffer.readUInt16LE(16) === EV_KEY_CODE) {
+      parsedEvent = {
+        timestamp: {
+          seconds: buffer.readUInt16LE(0),
+          milliseconds: buffer.readUInt16LE(8),
+        },
+        keyCode: buffer.readUInt16LE(18),
+        type: KEY_EVENT_TYPES[buffer.readUInt32LE(20)],
+      };
+      parsedEvent.keyName = keyMappings[parsedEvent.keyCode] || 'UNKNOWN_KEY';
+    }
+    return parsedEvent;
+  }
 }
 
+// Exporting the class with key mappings
+KeyboardListener.KeyCodes = keyMappings;
 
-Keyboard.Keys = toKey;
-
-module.exports = Keyboard;
+module.exports = KeyboardListener;
